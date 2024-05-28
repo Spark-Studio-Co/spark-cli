@@ -1,14 +1,38 @@
 use clap::{Command, Arg};
 use std::fs;
 use std::env;
+use std::io::{self, Write}; // Correctly import the `io` module and `Write` trait
 use std::process::Command as SystemCommand;
 use std::path::{Path, PathBuf};
+use colored::*;
+
 
 
 fn main() {
-    println!("Hello, world!");
+    println!("{}", "
 
-    // Initializing new project
+              ==
+             =**+
+            =****+
++-         :******-         -+
+***=.      +**##***      .=***
+*****+.    **####**.   .=*****
+#******-   ########.  -*******
+=*##****-  =######*  -****##*=
+- .-+###*.  +####*  .**##*-. -
+**=.  -*#+.  -##-  .+#*-  .=**
+#***+:  .+#+.     =#+:  :+***#
+-*#***+-  .=*:  .*=.  -+***#*-
+  :+##***=.        .-***##+:
+    .=##***=:    :=***##=.
+       -*#***+--+***#*-
+         :+##****##+:
+           .=####=.
+
+
+
+".truecolor(252, 101, 2));
+
     let matches = Command::new("Spark CLI")
         .version("1.0")
         .author("Spark Studio")
@@ -26,16 +50,26 @@ fn main() {
     let project_type = matches.get_one::<String>("cli_commands").expect("required and checked by clap");
     let project_name = matches.get_one::<String>("project_name").expect("required and checked by clap");
 
+    // Prompt user for project version
+    println!("{}", "Please write version of the project:\n".truecolor(252, 101, 2)); // New line included explicitly
+    io::stdout().flush().unwrap(); // Ensure the output is flushed immediately
+    let mut project_version = String::new();
+    io::stdin().read_line(&mut project_version).expect("Failed to read line");
+    let project_version = project_version.trim(); // Trim whitespace and newlines
 
-    match project_type.as_str() { // Use as_str() to convert &String to &str
-        "react@fsd" => init_react_fsd(project_name),
-        _ => println!("Project type not supported"),
+    match project_type.as_str()  { // Use as_str() to convert &String to &str
+        "react@fsd" => init_react_fsd(project_name, project_version),
+        _ => println!("{}","Project type not supported".truecolor(252, 101, 2)),
     }
 
-    fn init_react_fsd(project_name: &str) {
+
+    // Creating react project with feature-sliced-design
+    fn init_react_fsd(project_name: &str, project_version: &str) {
         // Determine the current working directory
         let cwd = env::current_dir().expect("Failed to determine the current directory");
         println!("Current directory: {:?}", cwd);
+        println!("Version: '{}'", project_version);
+
 
         // Set up the full path for the new project
         let full_project_path = cwd.join(project_name);
@@ -52,6 +86,7 @@ fn main() {
             "src/features",
             "src/entities",
             "src/shared",
+            "src/shared/styles",
             "src/redux",
             "public"
         ];
@@ -63,35 +98,38 @@ fn main() {
         }
 
         let package_json_path = full_project_path.join("package.json");
-        let package_json_content = r#"
-    {
-      "name": "my-react-app",
-      "version": "0.0.1",
-      "scripts": {
-        "dev": "vite",
-        "build": "vite build",
-        "serve": "vite preview"
-      },
-      "dependencies": {
-        "react": "^18",
-        "react-dom": "^18",
-        "breakpoint-slicer": "^3.0.0-beta.1",
-        "gsap": "^3.12.5"
-      },
-      "devDependencies": {
-        "@vitejs/plugin-react": "^1.0.0",
-        "vite": "^2.0.0",
-        "tailwindcss": "^3.3.0",
-        "typescript": "5.3.3",
-        "sass": "^1.70.0",
-        "autoprefixer": "^10.0.1",
-        "eslint": "^8",
-        "eslint-config-next": "14.1.0",
-        "postcss": "^8",
-        "prettier": "^3.2.5"
-      }
-    }
-    "#;
+        let package_json_content = format!(r#"{{
+        "name": "{}",
+        "version": "{}",
+        "private": true,
+        "type": "module",
+        "scripts": {{
+            "dev": "vite",
+            "build": "tsc && vite build",
+            "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+            "preview": "vite preview"
+        }},
+        "dependencies": {{
+            "react": "^18.2.0",
+            "react-dom": "^18.2.0",
+            "gsap": "^3.12.5"
+        }},
+        "devDependencies": {{
+            "@types/react": "^18.2.66",
+            "@types/react-dom": "^18.2.22",
+            "@typescript-eslint/eslint-plugin": "^7.2.0",
+            "@typescript-eslint/parser": "^7.2.0",
+            "@vitejs/plugin-react": "^4.2.1",
+            "eslint": "^8.57.0",
+            "sass": "^1.77.6",
+            "breakpoint-slicer": "^3.0.0-beta.1",
+            "tailwindcss": "^3.4.4",
+            "eslint-plugin-react-hooks": "^4.6.0",
+            "eslint-plugin-react-refresh": "^0.4.6",
+            "typescript": "^5.2.2",
+            "vite": "^5.2.0"
+        }}
+    }}"#, project_name, project_version);
 
         fs::write(&package_json_path, package_json_content).unwrap_or_else(|_| panic!("Failed to write package.json"));
 
@@ -101,6 +139,9 @@ fn main() {
     import { defineConfig } from 'vite'
     import react from '@vitejs/plugin-react'
     import path from "path";
+    import { fileURLToPath } from "url";
+
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
     export default defineConfig({
       plugins: [react()],
@@ -164,31 +205,18 @@ fn main() {
         // Create tsconfig.node.json
         let tsconfig_node_path = full_project_path.join("tsconfig.node.json");
         let tsconfig_node_content = r#"
-        {
-            "compilerOptions": {
-              "target": "ES2020",
-              "useDefineForClassFields": true,
-              "lib": ["ES2020", "DOM", "DOM.Iterable"],
-              "module": "ESNext",
-              "skipLibCheck": true,
-
-              /* Bundler mode */
-              "moduleResolution": "bundler",
-              "allowImportingTsExtensions": true,
-              "resolveJsonModule": true,
-              "isolatedModules": true,
-              "noEmit": true,
-              "jsx": "react-jsx",
-
-              /* Linting */
-              "strict": true,
-              "noUnusedLocals": true,
-              "noUnusedParameters": true,
-              "noFallthroughCasesInSwitch": true
-            },
-            "include": ["src"],
-            "references": [{ "path": "./tsconfig.node.json" }]
+       {
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": ["vite.config.ts"]
 }
+
 "#;
 
         fs::write(&tsconfig_node_path, tsconfig_node_content).unwrap_or_else(|_| panic!("Failed to write tsconfig.node.json"));
@@ -296,14 +324,18 @@ fn main() {
         fs::write(&tailwind_config_path, tailwind_config_content).unwrap_or_else(|_| panic!("Failed to write tailwind.config.js"));
 
 
-        // Create postcss.config.cjs
-        let postcss_config_path = full_project_path.join("postcss.config.cjs");
+        // Create postcss.config.mjs
+        let postcss_config_path = full_project_path.join("postcss.config.mjs");
         let postcss_content  = r#"
-        module.exports = {
-            plugins: {
-              tailwindcss: {},
-            },
-        };
+     /** @type {import('postcss-load-config').Config} */
+     const config = {
+        plugins: {
+            tailwindcss: {},
+        },
+};
+
+export default config;
+
 "#;
 
         fs::write(&postcss_config_path, postcss_content).unwrap_or_else(|_| panic!("Failed to write postcss.cjs"));
@@ -321,46 +353,72 @@ fn main() {
         // Create App.jsx
         let app_tsx_path = full_project_path.join("src/App.tsx");
         let app_tsx_content = r#"
+        import "@shared/styles/global.scss";
 
-        import "@shared/styles/global.scss"
-
-        export const App() {
-          return (
-            <div>
-              <h1>Hello from Feature-Sliced Design!</h1>
-            </div>
-          )
+        function App() {
+          return <>Hello From Spark CLI!</>;
         }
 
-        export default App
+        export default App;
     "#;
         fs::write(&app_tsx_path, app_tsx_content).unwrap_or_else(|_| panic!("Failed to write App.jsx"));
 
 
         println!("React project initialized with Feature-Sliced Design at {}", full_project_path.display());
 
+        // Create global scss file
+        let global_scss_path = full_project_path.join("src/shared/styles/global.scss");
+        let global_scss_content = r#"
+        * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+        "#;
+
+        if !global_scss_path.parent().unwrap().exists() {
+            std::fs::create_dir_all(global_scss_path.parent().unwrap())
+                .expect("Failed to create directories for global.scss");
+        }
+
+        println!("Global SCSS path: {:?}", global_scss_path);
+        std::fs::write(&global_scss_path, &global_scss_content)
+            .unwrap_or_else(|err| panic!("Failed to write global.scss: {}", err));
+
+        println!("global.scss created successfully.");
+
 // Create index.html
-        let index_html_path = full_project_path.join("public/index.html");
+        let index_html_path = full_project_path.join("index.html");
         let index_html_content = r#"
     <!DOCTYPE html>
     <html lang="en">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>My React App</title>
+        <title>Spark App</title>
       </head>
       <body>
         <div id="root"></div>
-        <script type="module" src="/src/main.jsx"></script>
+        <script type="module" src="/src/main.tsx"></script>
       </body>
     </html>
     "#;
         fs::write(&index_html_path, index_html_content).unwrap_or_else(|_| panic!("Failed to write index.html"));
 
+        let svg_source_path = Path::new("src/spark.svg"); // Adjust path as necessary
+        let svg_target_path = full_project_path.join("public/spark.svg");
+
+        fs::copy(svg_source_path, &svg_target_path).expect("Failed to copy SVG file");
+
+
+
         println!("React project initialized with Feature-Sliced Design at {}", full_project_path.display());
 
         install_dependencies(&full_project_path);
     }
+
+
 
     // Download all dependencies for this project
     fn install_dependencies(project_path: &Path) {
@@ -378,4 +436,5 @@ fn main() {
             println!("Failed to install dependencies.");
         }
     }
+
 }
